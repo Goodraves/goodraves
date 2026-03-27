@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserData } from '../context/UserDataContext'
 import { searchArtist, HAS_SPOTIFY } from '../api/spotify'
+import { getCityImage } from '../api/wikipedia'
 
 function CalendarIcon() {
   return (
@@ -51,16 +52,33 @@ export default function FestivalCard({ event }) {
   const [fallbackImage, setFallbackImage] = useState(null)
   
   useEffect(() => {
-    if (event.image || !HAS_SPOTIFY || artistCount === 0) return
+    if (event.image) return
     let cancelled = false
-    const mainArtist = event.attractions[0].name
-    searchArtist(mainArtist)
-      .then(sp => {
-        if (!cancelled && sp?.image) setFallbackImage(sp.image)
-      })
-      .catch(() => {})
+    
+    const fetchCityFallback = () => {
+      if (event.venue?.city) {
+        getCityImage(event.venue.city)
+          .then(img => { if (!cancelled && img) setFallbackImage(img) })
+          .catch(() => {})
+      }
+    }
+
+    if (HAS_SPOTIFY && artistCount > 0) {
+      const mainArtist = event.attractions[0].name
+      searchArtist(mainArtist)
+        .then(sp => {
+          if (!cancelled) {
+            if (sp?.image) setFallbackImage(sp.image)
+            else fetchCityFallback()
+          }
+        })
+        .catch(() => { if (!cancelled) fetchCityFallback() })
+    } else {
+      fetchCityFallback()
+    }
+
     return () => { cancelled = true }
-  }, [event.image, artistCount, event.attractions])
+  }, [event.image, artistCount, event.attractions, event.venue?.city])
 
   const displayImage = event.image || fallbackImage
 

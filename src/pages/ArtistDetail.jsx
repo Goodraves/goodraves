@@ -310,7 +310,7 @@ export default function ArtistDetail() {
             <h2 className="section-title" style={{ marginBottom: 16 }}>Top Tracks</h2>
             <ul className="track-list" id="top-tracks-list">
               {lastfmTracks.map((t, i) => {
-                const spotifySearchUrl = `https://open.spotify.com/search/${encodeURIComponent(artistName + ' ' + t.name)}/tracks`
+                const spotifySearchUrl = `https://open.spotify.com/search/${encodeURIComponent(artistName + ' ' + t.name)}`
                 return (
                   <li key={t.name + i} className="track-item">
                     <span className="track-num">{i + 1}</span>
