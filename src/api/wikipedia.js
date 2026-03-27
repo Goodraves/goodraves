@@ -2,7 +2,7 @@ export async function getWikiImage(searchQuery) {
   if (!searchQuery) return null
   try {
     // Wikipedia API to get page thumbnail
-    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(cityName)}&prop=pageimages&format=json&pithumbsize=600&origin=*`)
+    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(searchQuery)}&prop=pageimages&format=json&pithumbsize=600&origin=*`)
     const data = await res.json()
     const pages = data.query?.pages
     if (!pages) return null
