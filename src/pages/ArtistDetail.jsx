@@ -231,7 +231,7 @@ export default function ArtistDetail() {
                 </a>
               )}
               <a
-                href={`https://ra.co/dj/${artistName.toLowerCase().replace(/\\s+/g, '-')}`}
+                href={`https://ra.co/dj/${artistName.toLowerCase().replace(/\s+/g, '')}`}
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-secondary btn-sm ra-link"

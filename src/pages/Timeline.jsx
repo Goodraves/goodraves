@@ -15,13 +15,18 @@ function formatDate(dateStr) {
 
 export default function Timeline() {
   const navigate = useNavigate()
-  const { attendedFestivals, festivalMeta, seenArtists, artistMeta, artistRatings } = useUserData()
+  const { attendedFestivals, upcomingFestivals, festivalMeta, seenArtists, artistMeta, artistRatings, getFestivalMeta } = useUserData()
 
-  // Build a list of attended festivals with metadata
+  // Combine attended + upcoming for a full timeline view
+  const allFestivalIds = useMemo(() => {
+    return [...new Set([...attendedFestivals, ...upcomingFestivals])]
+  }, [attendedFestivals, upcomingFestivals])
+
+  // Build a list of festivals with metadata
   const festivals = useMemo(() => {
-    return attendedFestivals
+    return allFestivalIds
       .map(id => {
-        const meta = festivalMeta[id]
+        const meta = getFestivalMeta(id)
         const date = meta?.date ?? null
         const year = date ? new Date(date + 'T00:00:00').getFullYear() : null
         const month = date ? new Date(date + 'T00:00:00').getMonth() + 1 : null
@@ -31,14 +36,15 @@ export default function Timeline() {
           image: artistMeta[aid]?.image ?? null,
           rating: artistRatings[aid] ?? 0,
         }))
-        return { id, meta, year, month, seen }
+        const isUpcoming = upcomingFestivals.includes(id)
+        return { id, meta, year, month, seen, isUpcoming }
       })
       .filter(f => f.meta)
       .sort((a, b) => {
         if (a.meta.date && b.meta.date) return a.meta.date.localeCompare(b.meta.date)
         return 0
       })
-  }, [attendedFestivals, festivalMeta, seenArtists, artistMeta, artistRatings])
+  }, [allFestivalIds, getFestivalMeta, seenArtists, artistMeta, artistRatings, upcomingFestivals])
 
   // Get available years
   const years = useMemo(() => {
@@ -109,11 +115,11 @@ export default function Timeline() {
             <div className="empty-state-icon">📅</div>
             <h3>No festivals in this period</h3>
             <p>
-              {attendedFestivals.length === 0
-                ? 'You haven\'t marked any festivals as attended yet. Head to Discover!'
-                : `No attended festivals found for ${selectedMonth !== 'All' ? selectedMonth + ' ' : ''}${selectedYear}.`}
+              {allFestivalIds.length === 0
+                ? 'You haven\'t marked any festivals yet. Head to Discover!'
+                : `No festivals found for ${selectedMonth !== 'All' ? selectedMonth + ' ' : ''}${selectedYear}.`}
             </p>
-            {attendedFestivals.length === 0 && (
+            {allFestivalIds.length === 0 && (
               <button className="btn btn-primary" onClick={() => navigate('/')} id="go-discover-timeline">
                 Discover Festivals
               </button>
@@ -161,6 +167,7 @@ export default function Timeline() {
                     </div>
                   </div>
                   {f.meta?.genre && <span className="tag">{f.meta.genre}</span>}
+                  {f.isUpcoming && <span className="tag" style={{ background: '#3b82f6', color: '#fff', borderColor: '#3b82f6' }}>Upcoming</span>}
                 </div>
 
                 {/* Artists seen at this festival */}

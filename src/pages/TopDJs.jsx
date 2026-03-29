@@ -213,14 +213,6 @@ export default function TopDJs() {
                     )}
                   </div>
 
-                  {/* Spotify popularity */}
-                  {sp && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, gap: 2 }} onClick={e => e.stopPropagation()}>
-                      <SpotifyIcon size={12} />
-                      <span style={{ fontSize: '0.72rem', color: '#1DB954', fontWeight: 700 }}>{sp.popularity}</span>
-                    </div>
-                  )}
-
                   {/* Count badge */}
                   <div style={{ textAlign: 'center', flexShrink: 0 }}>
                     <div style={{

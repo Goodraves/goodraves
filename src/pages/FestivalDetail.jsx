@@ -183,7 +183,7 @@ export default function FestivalDetail() {
             {event.genre && <span className="tag">{event.genre}</span>}
             {event.subGenre && event.subGenre !== event.genre && <span className="tag tag-orange">{event.subGenre}</span>}
             {event.ages && <span className="tag tag-purple">{event.ages}</span>}
-            {isRA && <span className="tag" style={{ border: '1px solid #333' }}>Scraped Data</span>}
+
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
