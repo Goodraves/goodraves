@@ -2,8 +2,6 @@ import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserData } from '../context/UserDataContext'
 import { searchArtist, HAS_SPOTIFY } from '../api/spotify'
-import StarRating from '../components/StarRating'
-
 function SpotifyIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="#1DB954">
@@ -154,7 +152,8 @@ export default function TopDJs() {
                     gap: 16,
                     cursor: 'pointer',
                     transition: 'border-color 250ms ease, transform 200ms ease',
-                    flexWrap: 'wrap',
+                    flexWrap: 'nowrap',
+                    overflow: 'hidden',
                   }}
                   onClick={() => navigate(`/artist/${encodeURIComponent(artist.name)}?id=${artist.id}`)}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-hover)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
@@ -190,22 +189,18 @@ export default function TopDJs() {
                   </div>
 
                   {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>
+                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: 4, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {artist.name}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {artist.festivals.map(f => (
-                        <span key={f.id} style={{ background: 'var(--bg-glass)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 999 }}>
-                          {f.name}
-                        </span>
-                      ))}
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', marginBottom: 2 }}>
+                      {artist.festivals.map(f => f.name).join(' • ')}
                     </div>
                     {/* Spotify genres */}
                     {sp?.genres?.length > 0 && (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 4 }}>
                         {sp.genres.slice(0, 3).map(g => (
-                          <span key={g} style={{ fontSize: '0.68rem', padding: '1px 8px', borderRadius: 999, background: 'rgba(29, 185, 84, 0.12)', color: '#1DB954', border: '1px solid rgba(29, 185, 84, 0.25)', textTransform: 'capitalize' }}>
+                          <span key={g} style={{ fontSize: '0.68rem', padding: '1px 8px', borderRadius: 999, background: 'rgba(29, 185, 84, 0.12)', color: '#1DB954', border: '1px solid rgba(29, 185, 84, 0.25)', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
                             {g}
                           </span>
                         ))}
@@ -230,13 +225,6 @@ export default function TopDJs() {
                       seen
                     </div>
                   </div>
-
-                  {/* Rating */}
-                  {artist.rating > 0 && (
-                    <div style={{ flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                      <StarRating artistId={artist.id} readonly size="sm" />
-                    </div>
-                  )}
                 </div>
               )
             })}

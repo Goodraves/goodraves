@@ -1,36 +1,42 @@
+import React, { Suspense, lazy } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
-import Home from './pages/Home'
-import FestivalDetail from './pages/FestivalDetail'
-import ArtistDetail from './pages/ArtistDetail'
-import Dashboard from './pages/Dashboard'
-import Timeline from './pages/Timeline'
-import TopDJs from './pages/TopDJs'
 import { UserDataProvider } from './context/UserDataContext'
 import ErrorBoundary from './components/ErrorBoundary'
+
+const Home = lazy(() => import('./pages/Home'))
+const FestivalDetail = lazy(() => import('./pages/FestivalDetail'))
+const ArtistDetail = lazy(() => import('./pages/ArtistDetail'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Timeline = lazy(() => import('./pages/Timeline'))
+const TopDJs = lazy(() => import('./pages/TopDJs'))
+const Insights = lazy(() => import('./pages/Insights'))
 
 export default function App() {
   return (
     <UserDataProvider>
       <Navbar />
       <ErrorBoundary>
-        <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/festival/:id" element={<FestivalDetail />} />
-        <Route path="/artist/:name" element={<ArtistDetail />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/timeline" element={<Timeline />} />
-        <Route path="/top-djs" element={<TopDJs />} />
-        <Route path="*" element={
-          <div className="page">
-            <div className="container" style={{ textAlign: 'center', paddingTop: 80 }}>
-              <div style={{ fontSize: '4rem', marginBottom: 16 }}>🎵</div>
-              <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: 8 }}>Page Not Found</h2>
-              <p style={{ color: 'var(--text-muted)' }}>This page doesn't exist.</p>
+        <Suspense fallback={<div className="container" style={{paddingTop: 80, textAlign: 'center', color: 'var(--text-muted)'}}>Loading maps and metrics...</div>}>
+          <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/festival/:id" element={<FestivalDetail />} />
+          <Route path="/artist/:name" element={<ArtistDetail />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/timeline" element={<Timeline />} />
+          <Route path="/top-djs" element={<TopDJs />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="*" element={
+            <div className="page">
+              <div className="container" style={{ textAlign: 'center', paddingTop: 80 }}>
+                <div style={{ fontSize: '4rem', marginBottom: 16 }}>🎵</div>
+                <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: 8 }}>Page Not Found</h2>
+                <p style={{ color: 'var(--text-muted)' }}>This page doesn't exist.</p>
+              </div>
             </div>
-          </div>
-        } />
-        </Routes>
+          } />
+          </Routes>
+        </Suspense>
       </ErrorBoundary>
     </UserDataProvider>
   )

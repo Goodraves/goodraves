@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useState, useRef, useCallback } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import RA_STATIC_EVENTS from '../data/ra-events'
 import { createSyncBlob, readSyncBlob, updateSyncBlob } from '../api/cloudSync'
 
@@ -347,40 +347,39 @@ export function UserDataProvider({ children }) {
     URL.revokeObjectURL(url)
   }
 
+  const contextValue = useMemo(() => ({
+    ...state,
+    toggleAttended,
+    toggleUpcoming,
+    toggleSawArtist,
+    setRating,
+    setPerformanceRating,
+    setNotes,
+    isAttended,
+    isUpcoming,
+    didSeeArtist,
+    getSeenCount,
+    getRating,
+    getPerformanceRating,
+    getNotes,
+    getFestivalMeta,
+    getArtistMeta,
+    getArtistSeenCounts,
+    exportData,
+    importData,
+    batchImportRA,
+    clearImportedRA,
+    syncSettings,
+    syncStatus,
+    enableSync,
+    connectSync,
+    pullSync,
+    pushSync,
+    disconnectSync,
+  }), [state, syncSettings, syncStatus]);
+
   return (
-    <UserDataContext.Provider
-      value={{
-        ...state,
-        toggleAttended,
-        toggleUpcoming,
-        toggleSawArtist,
-        setRating,
-        setPerformanceRating,
-        setNotes,
-        isAttended,
-        isUpcoming,
-        didSeeArtist,
-        getSeenCount,
-        getRating,
-        getPerformanceRating,
-        getNotes,
-        getFestivalMeta,
-        getArtistMeta,
-        getArtistSeenCounts,
-        exportData,
-        importData,
-        batchImportRA,
-        clearImportedRA,
-        // Cloud Sync
-        syncSettings,
-        syncStatus,
-        enableSync,
-        connectSync,
-        pullSync,
-        pushSync,
-        disconnectSync,
-      }}
-    >
+    <UserDataContext.Provider value={contextValue}>
       {children}
     </UserDataContext.Provider>
   )

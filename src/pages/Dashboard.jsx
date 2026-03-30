@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useUserData } from '../context/UserDataContext'
 import { getEventById } from '../api/ticketmaster'
 import RAImport from '../components/RAImport'
-import SyncSettings from '../components/SyncSettings'
+
 
 const HAS_KEY = import.meta.env.VITE_TICKETMASTER_KEY &&
   import.meta.env.VITE_TICKETMASTER_KEY !== 'your_ticketmaster_api_key_here'
@@ -216,9 +216,6 @@ export default function Dashboard() {
         </div>
 
         <div className="divider" />
-
-        {/* Cloud Sync */}
-        <SyncSettings />
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>

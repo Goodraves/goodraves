@@ -1,11 +1,12 @@
 /**
- * Cloud Sync via jsonblob.com
- * Free, no auth required, CORS-enabled JSON storage.
- * Each "blob" is a JSON document with a unique ID.
- * The blob ID becomes the user's sync code.
+ * Cloud Sync via jsonblob.com — proxied through Netlify function
+ * to avoid CORS issues. Requests go to /.netlify/functions/sync
+ * which forwards them server-side to jsonblob.com.
+ *
+ * In development, requests go directly to jsonblob.com.
  */
 
-const API_BASE = 'https://jsonblob.com/api/jsonBlob'
+const PROXY_BASE = '/.netlify/functions/sync'
 
 /**
  * Create a new sync blob with initial data.
@@ -13,7 +14,7 @@ const API_BASE = 'https://jsonblob.com/api/jsonBlob'
  * @returns {string} blobId - The unique sync code
  */
 export async function createSyncBlob(data) {
-  const res = await fetch(API_BASE, {
+  const res = await fetch(PROXY_BASE, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -24,11 +25,10 @@ export async function createSyncBlob(data) {
 
   if (!res.ok) throw new Error(`Failed to create sync: ${res.status}`)
 
-  // The blob ID comes from the Location header
-  const location = res.headers.get('Location') || res.headers.get('location')
-  if (!location) throw new Error('No Location header returned from API')
+  const result = await res.json()
+  if (!result.id) throw new Error('No blob ID returned from sync proxy')
 
-  return location.split('/').pop()
+  return result.id
 }
 
 /**
@@ -37,7 +37,7 @@ export async function createSyncBlob(data) {
  * @returns {{ data: object, updatedAt: number }}
  */
 export async function readSyncBlob(blobId) {
-  const res = await fetch(`${API_BASE}/${blobId}`, {
+  const res = await fetch(`${PROXY_BASE}?id=${encodeURIComponent(blobId)}`, {
     headers: { 'Accept': 'application/json' },
   })
 
@@ -53,7 +53,7 @@ export async function readSyncBlob(blobId) {
  * @param {object} data - The user data to store
  */
 export async function updateSyncBlob(blobId, data) {
-  const res = await fetch(`${API_BASE}/${blobId}`, {
+  const res = await fetch(`${PROXY_BASE}?id=${encodeURIComponent(blobId)}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
