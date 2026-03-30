@@ -126,8 +126,6 @@ export default function FestivalCard({ event }) {
 
       <div className="festival-card-body">
         <div className="festival-card-tags">
-          {isEdmtrain && <span className="tag tag-edm">⚡ EDMTrain</span>}
-          {!isEdmtrain && event.source === 'ticketmaster' && <span className="tag tag-tm">🎫 TM</span>}
           {event.genre && <span className="tag">{event.genre}</span>}
           {event.subGenre && event.subGenre !== event.genre && (
             <span className="tag tag-orange">{event.subGenre}</span>

@@ -162,9 +162,6 @@ export default function FestivalDetail() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
             <h1 className="festival-hero-title" style={{ margin: 0 }}>{event.name}</h1>
-            {isEdmtrain && <span className="source-badge source-badge-edm">⚡ EDMTrain</span>}
-            {isRA && <span className="source-badge" style={{ background: '#000' }}>🎧 Resident Advisor</span>}
-            {!isEdmtrain && !isRA && event.source === 'ticketmaster' && <span className="source-badge source-badge-tm">🎫 TM</span>}
           </div>
 
           <div className="festival-meta-row">

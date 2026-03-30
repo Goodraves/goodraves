@@ -1,7 +1,30 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useState, useRef, useCallback } from 'react'
 import RA_STATIC_EVENTS from '../data/ra-events'
+import { createSyncBlob, readSyncBlob, updateSyncBlob } from '../api/cloudSync'
 
 const STORAGE_KEY = 'festival_tracker_v1'
+const SYNC_KEY = 'goodraves_sync'
+
+/** Load sync settings (syncCode, lastSyncAt) from localStorage */
+function loadSyncSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}
+  } catch {
+    return {}
+  }
+}
+
+/** Strip static RA events from state before uploading to keep payload small */
+function getUploadData(state) {
+  const { raEvents, ...rest } = state
+  const userImportedRa = {}
+  for (const [key, val] of Object.entries(raEvents)) {
+    if (!RA_STATIC_EVENTS[key]) {
+      userImportedRa[key] = val
+    }
+  }
+  return { ...rest, raEvents: userImportedRa }
+}
 
 const defaultState = {
   attendedFestivals: [],     // string[] of event IDs (past attended)
@@ -112,9 +135,157 @@ const UserDataContext = createContext(null)
 export function UserDataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadState)
 
+  // ── Cloud Sync State ──────────────────────────────────────────────
+  const [syncSettings, setSyncSettingsRaw] = useState(loadSyncSettings)
+  const [syncStatus, setSyncStatus] = useState('idle') // 'idle' | 'syncing' | 'success' | 'error'
+  const skipNextPush = useRef(false)
+  const syncCodeRef = useRef(syncSettings.syncCode)
+
+  const setSyncSettings = useCallback((val) => {
+    setSyncSettingsRaw(prev => {
+      const next = typeof val === 'function' ? val(prev) : val
+      localStorage.setItem(SYNC_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  // Keep ref in sync
+  useEffect(() => {
+    syncCodeRef.current = syncSettings.syncCode
+  }, [syncSettings.syncCode])
+
+  // Save state to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [state])
+
+  // ── Auto-pull from cloud on app load ──────────────────────────────
+  useEffect(() => {
+    const code = loadSyncSettings().syncCode
+    if (!code) return
+    let cancelled = false
+
+    readSyncBlob(code)
+      .then(result => {
+        if (cancelled || !result?.data) return
+        skipNextPush.current = true
+        dispatch({ type: 'IMPORT_DATA', payload: result.data })
+        setSyncSettings(prev => ({ ...prev, lastSyncAt: Date.now() }))
+      })
+      .catch(err => {
+        console.warn('Initial cloud sync pull failed:', err.message)
+      })
+
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-push to cloud on state changes (2s debounce) ─────────────
+  useEffect(() => {
+    const code = syncCodeRef.current
+    if (!code) return
+    if (skipNextPush.current) {
+      skipNextPush.current = false
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setSyncStatus('syncing')
+        await updateSyncBlob(code, getUploadData(state))
+        setSyncSettings(prev => ({ ...prev, lastSyncAt: Date.now() }))
+        setSyncStatus('success')
+        setTimeout(() => setSyncStatus('idle'), 2000)
+      } catch (err) {
+        console.error('Cloud sync push failed:', err)
+        setSyncStatus('error')
+        setTimeout(() => setSyncStatus('idle'), 4000)
+      }
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [state]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Sync Methods ──────────────────────────────────────────────────
+  /** Create a new cloud sync blob and start syncing */
+  const enableSync = async () => {
+    setSyncStatus('syncing')
+    try {
+      const blobId = await createSyncBlob(getUploadData(state))
+      syncCodeRef.current = blobId
+      setSyncSettings({ syncCode: blobId, lastSyncAt: Date.now() })
+      setSyncStatus('success')
+      setTimeout(() => setSyncStatus('idle'), 2000)
+      return blobId
+    } catch (err) {
+      setSyncStatus('error')
+      setTimeout(() => setSyncStatus('idle'), 4000)
+      throw err
+    }
+  }
+
+  /** Connect to an existing sync blob and pull its data */
+  const connectSync = async (code) => {
+    setSyncStatus('syncing')
+    try {
+      const result = await readSyncBlob(code)
+      if (!result?.data) throw new Error('Empty sync data')
+      skipNextPush.current = true
+      dispatch({ type: 'IMPORT_DATA', payload: result.data })
+      syncCodeRef.current = code
+      setSyncSettings({ syncCode: code, lastSyncAt: Date.now() })
+      setSyncStatus('success')
+      setTimeout(() => setSyncStatus('idle'), 2000)
+    } catch (err) {
+      setSyncStatus('error')
+      setTimeout(() => setSyncStatus('idle'), 4000)
+      throw err
+    }
+  }
+
+  /** Manually pull the latest data from cloud */
+  const pullSync = async () => {
+    const code = syncCodeRef.current
+    if (!code) return
+    setSyncStatus('syncing')
+    try {
+      const result = await readSyncBlob(code)
+      if (result?.data) {
+        skipNextPush.current = true
+        dispatch({ type: 'IMPORT_DATA', payload: result.data })
+        setSyncSettings(prev => ({ ...prev, lastSyncAt: Date.now() }))
+      }
+      setSyncStatus('success')
+      setTimeout(() => setSyncStatus('idle'), 2000)
+    } catch (err) {
+      setSyncStatus('error')
+      setTimeout(() => setSyncStatus('idle'), 4000)
+      throw err
+    }
+  }
+
+  /** Push current data to cloud manually */
+  const pushSync = async () => {
+    const code = syncCodeRef.current
+    if (!code) return
+    setSyncStatus('syncing')
+    try {
+      await updateSyncBlob(code, getUploadData(state))
+      setSyncSettings(prev => ({ ...prev, lastSyncAt: Date.now() }))
+      setSyncStatus('success')
+      setTimeout(() => setSyncStatus('idle'), 2000)
+    } catch (err) {
+      setSyncStatus('error')
+      setTimeout(() => setSyncStatus('idle'), 4000)
+      throw err
+    }
+  }
+
+  /** Stop syncing — keeps local data, removes cloud connection */
+  const disconnectSync = () => {
+    syncCodeRef.current = null
+    setSyncSettings({})
+    setSyncStatus('idle')
+  }
 
   const toggleAttended = (eventId, meta = null) =>
     dispatch({ type: 'TOGGLE_ATTENDED', payload: { id: eventId, meta } })
@@ -200,6 +371,14 @@ export function UserDataProvider({ children }) {
         importData,
         batchImportRA,
         clearImportedRA,
+        // Cloud Sync
+        syncSettings,
+        syncStatus,
+        enableSync,
+        connectSync,
+        pullSync,
+        pushSync,
+        disconnectSync,
       }}
     >
       {children}

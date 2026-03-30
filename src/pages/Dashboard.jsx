@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useUserData } from '../context/UserDataContext'
 import { getEventById } from '../api/ticketmaster'
 import RAImport from '../components/RAImport'
+import SyncSettings from '../components/SyncSettings'
 
 const HAS_KEY = import.meta.env.VITE_TICKETMASTER_KEY &&
   import.meta.env.VITE_TICKETMASTER_KEY !== 'your_ticketmaster_api_key_here'
@@ -80,7 +81,6 @@ function FestivalRow({ eventId, onRemove, isUpcomingTab }) {
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {displayEvent?.name ?? eventId}
           </div>
-          {eventId.startsWith('ra-') && <span className="source-badge source-badge-edm" style={{ background: '#000', fontSize: '0.65rem', padding: '1px 4px' }}>RA</span>}
         </div>
         <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {displayEvent?.date && <span>📅 {formatDate(displayEvent.date)}</span>}
@@ -216,7 +216,10 @@ export default function Dashboard() {
         </div>
 
         <div className="divider" />
-        
+
+        {/* Cloud Sync */}
+        <SyncSettings />
+
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
           <button
