@@ -8,6 +8,7 @@ export default function AddCustomEvent({ onClose }) {
   const [venueName, setVenueName] = useState('')
   const [city, setCity] = useState('')
   const [genre, setGenre] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
   const [lineupText, setLineupText] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -23,7 +24,7 @@ export default function AddCustomEvent({ onClose }) {
         city: city.trim() || null,
       },
       genre: genre.trim() || null,
-      image: null,
+      image: imageUrl.trim() || null,
     }
 
     // Parse lineup: comma or newline separated
@@ -118,7 +119,7 @@ export default function AddCustomEvent({ onClose }) {
       </div>
 
       {/* Venue & City */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="form-grid">
         <div>
           <label style={labelStyle}>Venue</label>
           <input
@@ -149,6 +150,18 @@ export default function AddCustomEvent({ onClose }) {
           value={genre}
           onChange={e => setGenre(e.target.value)}
           placeholder="e.g. Techno, House, Drum & Bass"
+          style={inputStyle}
+        />
+      </div>
+
+      {/* Image URL */}
+      <div>
+        <label style={labelStyle}>Image URL</label>
+        <input
+          type="text"
+          value={imageUrl}
+          onChange={e => setImageUrl(e.target.value)}
+          placeholder="e.g. https://example.com/fest-image.jpg"
           style={inputStyle}
         />
       </div>

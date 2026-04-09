@@ -107,7 +107,7 @@ export default function TopDJs() {
           image: meta?.image ?? null,
           count,
           rating,
-          festivals,
+          festivals: festivals.sort((a,b) => (a.date || '').localeCompare(b.date || '')),
         }
       })
       .sort((a, b) => {
@@ -128,6 +128,8 @@ export default function TopDJs() {
       })
       .map(a => a.name)
   }, [ranking, artistMeta])
+  
+  const [artistToManage, setArtistToManage] = useState(null)
   
   const spotifyData = useSpotifyEnrichment(artistNames, (results) => {
     // Save enriched data back to global artistMeta
@@ -223,7 +225,7 @@ export default function TopDJs() {
                     flexWrap: 'nowrap',
                     overflow: 'hidden',
                   }}
-                  onClick={() => navigate(`/artist/${encodeURIComponent(artist.name)}?id=${artist.id}`)}
+                  onClick={() => setArtistToManage(artist)}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-hover)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = index === 0 ? 'rgba(251, 191, 36, 0.3)' : 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)' }}
                 >
@@ -261,14 +263,34 @@ export default function TopDJs() {
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: 4, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {artist.name}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', marginBottom: 2 }}>
-                      {artist.festivals.map(f => f.name).join(' • ')}
-                    </div>
-                    {/* Genres */}
+                    {/* Festivals list removed as per user request (moved to pop-up) */}
+                    {/* Full-width container that scrolls horizontal if genres overflow */}
                     {((sp?.genres?.length > 0) || (artistMeta[artist.id]?.genres?.length > 0)) && (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 4 }}>
-                        {(sp?.genres || artistMeta[artist.id]?.genres || []).slice(0, 3).map(g => (
-                          <span key={g} style={{ fontSize: '0.68rem', padding: '1px 8px', borderRadius: 999, background: 'rgba(29, 185, 84, 0.12)', color: 'var(--accent)', border: '1px solid rgba(139, 92, 246, 0.25)', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
+                      <div 
+                        className="hide-scrollbar"
+                        style={{ 
+                          display: 'flex', 
+                          gap: 6, 
+                          overflowX: 'auto', 
+                          whiteSpace: 'nowrap',
+                          marginTop: 6,
+                          paddingBottom: 2, // avoid clipping badges
+                        }}
+                      >
+                        {(sp?.genres || artistMeta[artist.id]?.genres || []).slice(0, 5).map(g => (
+                          <span 
+                            key={g} 
+                            style={{ 
+                              fontSize: '0.68rem', 
+                              padding: '2px 10px', 
+                              borderRadius: 999, 
+                              background: 'rgba(139, 92, 246, 0.1)', 
+                              color: 'var(--accent)', 
+                              border: '1px solid rgba(139, 92, 246, 0.2)', 
+                              textTransform: 'capitalize',
+                              flexShrink: 0
+                            }}
+                          >
                             {g}
                           </span>
                         ))}
@@ -298,7 +320,157 @@ export default function TopDJs() {
             })}
           </div>
         )}
+        {ranking.length > 0 && (
+          <div style={{ marginTop: 24, padding: '0 4px', fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+            Click an artist to see history or go to profile
+          </div>
+        )}
+
+        <ArtistActionsModal 
+          artist={artistToManage} 
+          onClose={() => setArtistToManage(null)} 
+          artistMeta={artistMeta}
+        />
       </div>
     </div>
   )
 }
+
+/** Pop-up modal for DJ actions (See History / Go to Profile) */
+function ArtistActionsModal({ artist, onClose, artistMeta }) {
+  const navigate = useNavigate()
+  const [showHistory, setShowHistory] = useState(false)
+
+  if (!artist) return null
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) onClose()
+  }
+
+  const navigateToProfile = () => {
+    navigate(`/artist/${encodeURIComponent(artist.name)}?id=${artist.id}`)
+  }
+
+  return (
+    <div 
+      className="modal-overlay" 
+      onClick={handleBackdropClick}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        zIndex: 1000,
+      }}
+    >
+      <div 
+        className="fade-in"
+        style={{
+          background: 'var(--bg-card)',
+          width: '100%',
+          maxWidth: 400,
+          borderRadius: 20,
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+          boxShadow: 'var(--shadow-xl)',
+        }}
+      >
+        {!showHistory ? (
+          /* MAIN OPTIONS VIEW */
+          <div style={{ padding: 24 }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: '1.2rem', fontFamily: 'var(--font-display)', fontWeight: 800, marginBottom: 8 }}>
+                {artist.name}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                You have seen this DJ {artist.count} {artist.count === 1 ? 'time' : 'times'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => setShowHistory(true)}
+                style={{ width: '100%', padding: '14px' }}
+              >
+                📜 Show Festival History
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={navigateToProfile}
+                style={{ width: '100%', padding: '14px', border: '1px solid var(--border)' }}
+              >
+                👤 Go to DJ Profile
+              </button>
+              <button 
+                onClick={onClose}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--text-muted)', 
+                  fontSize: '0.85rem', 
+                  marginTop: 8, 
+                  cursor: 'pointer' 
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* HISTORY VIEW */
+          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
+            <div style={{ 
+              padding: '16px 20px', 
+              borderBottom: '1px solid var(--border)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between' 
+            }}>
+              <button 
+                onClick={() => setShowHistory(false)} 
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}
+              >
+                ← Back
+              </button>
+              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Festival History</span>
+              <div style={{ width: 40 }} /> {/* Spacer */}
+            </div>
+
+            <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+              {artist.festivals.map((fest, idx) => (
+                <div 
+                  key={fest.id + idx}
+                  style={{ 
+                    padding: '12px 0', 
+                    borderBottom: idx === artist.festivals.length - 1 ? 'none' : '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 2 }}>{fest.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {fest.date ? new Date(fest.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date TBA'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              className="btn btn-primary" 
+              onClick={onClose}
+              style={{ borderRadius: 0, padding: 16 }}
+            >
+              Done
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+

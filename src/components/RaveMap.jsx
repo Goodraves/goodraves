@@ -1,6 +1,5 @@
 import React from 'react'
 import { MapContainer, TileLayer, Popup, CircleMarker } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
 
 // Built-in dictionary of major cities
 const CITY_COORDS = {
@@ -92,7 +91,7 @@ const CITY_COORDS = {
   'Reykjavik': [64.1466, -21.9426],
 }
 
-export default function RaveMap({ events }) {
+export default React.memo(function RaveMap({ events }) {
   // Compute total events per city
   const cityCounts = {}
   events.forEach(e => {
@@ -141,4 +140,4 @@ export default function RaveMap({ events }) {
       </MapContainer>
     </div>
   )
-}
+})

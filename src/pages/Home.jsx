@@ -18,7 +18,7 @@ function SearchIcon() {
 export default function Home() {
   const [inputValue, setInputValue] = useState('')
   const [query, setQuery] = useState('')
-  const { raEvents } = useUserData()
+  const { raEvents, festivalMeta } = useUserData()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -63,13 +63,34 @@ export default function Home() {
       // Search local RA Events (always available)
       const queryLower = q.toLowerCase()
       const raResults = Object.values(raEvents).filter(ev => {
-        const matchTitle = ev.name.toLowerCase().includes(queryLower)
+        const matchTitle = ev.name?.toLowerCase().includes(queryLower)
         const matchLineup = ev.lineup?.some(a => a.toLowerCase().includes(queryLower))
         const matchVenue = ev.venue?.name?.toLowerCase().includes(queryLower)
         const matchCity = ev.venue?.city?.toLowerCase().includes(queryLower)
         return matchTitle || matchLineup || matchVenue || matchCity
       })
       results.push(...raResults)
+
+      // Search Custom Events (festivalMeta)
+      const customResults = Object.entries(festivalMeta || {})
+        .filter(([id, meta]) => {
+          if (!id.startsWith('custom-')) return false
+          const matchTitle = meta.name?.toLowerCase().includes(queryLower)
+          const matchVenue = meta.venue?.name?.toLowerCase().includes(queryLower)
+          const matchCity = meta.venue?.city?.toLowerCase().includes(queryLower)
+          const matchGenre = meta.genre?.toLowerCase().includes(queryLower)
+          return matchTitle || matchVenue || matchCity || matchGenre
+        })
+        .map(([id, meta]) => ({
+          id,
+          name: meta.name,
+          date: meta.date,
+          venue: meta.venue,
+          lineup: [], 
+          source: 'custom',
+          image: meta.image
+        }))
+      results.push(...customResults)
 
       // Sort by date
       const sorted = results.sort((a, b) => {

@@ -60,57 +60,77 @@ const FestivalRow = React.memo(({ eventId, onRemove, isUpcomingTab }) => {
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         borderRadius: 12,
-        padding: '16px 20px',
+        padding: '14px 16px',
         display: 'flex',
         alignItems: 'center',
-        gap: 16,
-        flexWrap: 'wrap',
+        gap: 12,
         cursor: 'pointer',
         transition: 'border-color 250ms ease',
+        overflow: 'hidden',
       }}
       onClick={() => navigate(`/festival/${eventId}`)}
       onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-hover)'}
       onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
     >
-      {displayEvent?.image && (
+      {/* Thumbnail */}
+      {displayEvent?.image ? (
         <img
           src={displayEvent.image}
           alt=""
-          style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+          style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
         />
-      )}
-      {!displayEvent?.image && <div style={{ width: 56, height: 56, borderRadius: 8, background: 'var(--gradient-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>{eventId.startsWith('ra-') ? '🎧' : eventId.startsWith('custom-') ? '🎪' : '🎵'}</div>}
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {displayEvent?.name ?? eventId}
-          </div>
+      ) : (
+        <div style={{ width: 48, height: 48, borderRadius: 8, background: 'var(--gradient-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', flexShrink: 0 }}>
+          {eventId.startsWith('ra-') ? '🎧' : eventId.startsWith('custom-') ? '🎪' : '🎵'}
         </div>
-        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {displayEvent?.date && <span>📅 {formatDate(displayEvent.date)}</span>}
-          {displayEvent?.venue && <span>📍 {displayEvent.venue.name}{displayEvent.venue.city ? `, ${displayEvent.venue.city}` : ''}</span>}
+      )}
+
+      {/* Text info — minWidth:0 is critical for truncation inside flex */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 700,
+          fontSize: '0.95rem',
+          marginBottom: 3,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          color: 'var(--text-primary)',
+        }}>
+          {displayEvent?.name ?? eventId}
+        </div>
+        <div style={{
+          fontSize: '0.78rem',
+          color: 'var(--text-secondary)',
+          display: 'flex',
+          gap: 10,
+          flexWrap: 'wrap',
+          lineHeight: 1.4,
+        }}>
+          {displayEvent?.date && (
+            <span style={{ whiteSpace: 'nowrap' }}>📅 {formatDate(displayEvent.date)}</span>
+          )}
+          {displayEvent?.venue?.city && (
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+              📍 {displayEvent.venue.city}
+            </span>
+          )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexShrink: 0 }}>
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
         {!isUpcomingTab && seenCount > 0 && (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, background: 'var(--gradient-hero)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{seenCount}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Artists seen</div>
-          </div>
-        )}
-        {!isUpcomingTab && avgRating && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#fbbf24' }}>{avgRating}★</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Avg rating</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, background: 'var(--gradient-hero)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{seenCount}</div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Seen</div>
           </div>
         )}
       </div>
 
       <button
         className="btn-ghost"
-        style={{ fontSize: '0.8rem', color: 'var(--text-muted)', flexShrink: 0 }}
+        style={{ fontSize: '0.85rem', color: 'var(--text-muted)', flexShrink: 0, padding: '4px 8px' }}
         onClick={handleRemove}
         id={`remove-${eventId}`}
         title="Remove from list"
