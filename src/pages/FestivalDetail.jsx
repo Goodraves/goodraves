@@ -46,7 +46,7 @@ export default function FestivalDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAttended, isUpcoming, toggleAttended, toggleUpcoming, getSeenCount, raEvents, festivalMeta, artistMeta } = useUserData()
+  const { isAttended, isUpcoming, toggleAttended, toggleUpcoming, getSeenCount, raEvents, festivalMeta, artistMeta, setFestivalRating, getFestivalRating } = useUserData()
 
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -225,6 +225,48 @@ export default function FestivalDetail() {
               </a>
             )}
           </div>
+
+          {/* Festival Rating — only show when attended */}
+          {attended && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                Vibe Rating
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[1, 2, 3, 4, 5].map(star => {
+                  const current = getFestivalRating(id)
+                  const filled = star <= current
+                  return (
+                    <button
+                      key={star}
+                      onClick={() => setFestivalRating(id, star === current ? 0 : star)}
+                      title={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '1.6rem',
+                        lineHeight: 1,
+                        padding: '2px',
+                        color: filled ? '#fbbf24' : 'rgba(255,255,255,0.2)',
+                        transition: 'transform 120ms ease, color 120ms ease',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                      ★
+                    </button>
+                  )
+                })}
+                {getFestivalRating(id) > 0 && (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center', marginLeft: 4 }}>
+                    {getFestivalRating(id)}/5
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

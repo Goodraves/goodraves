@@ -34,6 +34,7 @@ const defaultState = {
   artistMeta: {},            // { artistId: { name, image } }
   artistRatings: {},         // { artistId: number 1-5 }       ← global DJ rating (legacy)
   performanceRatings: {},    // { "eventId::artistId": number 1-5 } ← per-festival rating
+  festivalRatings: {},       // { eventId: number 1-5 }       ← overall festival rating
   artistNotes: {},           // { artistId: string }
   raEvents: {},              // { raId: { name, date, venue, city, lineup, link } }
 }
@@ -137,6 +138,10 @@ function reducer(state, action) {
       const key = `${eventId}::${artistId}`
       return { ...state, performanceRatings: { ...state.performanceRatings, [key]: rating } }
     }
+    case 'SET_FESTIVAL_RATING': {
+      const { eventId, rating } = action.payload
+      return { ...state, festivalRatings: { ...state.festivalRatings, [eventId]: rating } }
+    }
     case 'SET_NOTES': {
       const { artistId, notes } = action.payload
       return { ...state, artistNotes: { ...state.artistNotes, [artistId]: notes } }
@@ -187,6 +192,13 @@ function reducer(state, action) {
         nextState.upcomingFestivals = []
       }
       return cleanOrphanData(nextState)
+    }
+    case 'UPDATE_FESTIVAL_META': {
+      const { id, meta } = action.payload
+      return {
+        ...state,
+        festivalMeta: { ...state.festivalMeta, [id]: { ...state.festivalMeta[id], ...meta } }
+      }
     }
     default:
       return state
@@ -360,6 +372,8 @@ export function UserDataProvider({ children }) {
     dispatch({ type: 'SET_RATING', payload: { artistId, rating } })
   const setPerformanceRating = (eventId, artistId, rating) =>
     dispatch({ type: 'SET_PERFORMANCE_RATING', payload: { eventId, artistId, rating } })
+  const setFestivalRating = (eventId, rating) =>
+    dispatch({ type: 'SET_FESTIVAL_RATING', payload: { eventId, rating } })
   const setNotes = (artistId, notes) =>
     dispatch({ type: 'SET_NOTES', payload: { artistId, notes } })
   const batchImportRA = (events) =>
@@ -377,6 +391,8 @@ export function UserDataProvider({ children }) {
   }
   const clearFestivals = (type) =>
     dispatch({ type: 'CLEAR_FESTIVALS', payload: { type } })
+  const updateFestivalMeta = (id, meta) =>
+    dispatch({ type: 'UPDATE_FESTIVAL_META', payload: { id, meta } })
 
   const isAttended = (eventId) => state.attendedFestivals.includes(eventId)
   const isUpcoming = (eventId) => state.upcomingFestivals.includes(eventId)
@@ -390,6 +406,8 @@ export function UserDataProvider({ children }) {
   const getRating = (artistId) => state.artistRatings[artistId] ?? 0
   const getPerformanceRating = (eventId, artistId) =>
     state.performanceRatings[`${eventId}::${artistId}`] ?? 0
+  const getFestivalRating = (eventId) =>
+    state.festivalRatings?.[eventId] ?? 0
   const getNotes = (artistId) => state.artistNotes[artistId] ?? ''
   const getFestivalMeta = (eventId) => {
     if (eventId.startsWith('ra-')) {
@@ -434,6 +452,7 @@ export function UserDataProvider({ children }) {
     toggleSawArtist,
     setRating,
     setPerformanceRating,
+    setFestivalRating,
     setNotes,
     isAttended,
     isUpcoming,
@@ -441,6 +460,7 @@ export function UserDataProvider({ children }) {
     getSeenCount,
     getRating,
     getPerformanceRating,
+    getFestivalRating,
     getNotes,
     getFestivalMeta,
     getArtistMeta,
@@ -449,6 +469,7 @@ export function UserDataProvider({ children }) {
     importData,
     addCustomFestival,
     clearFestivals,
+    updateFestivalMeta,
     batchEnrichArtists,
     batchImportRA,
     clearImportedRA,

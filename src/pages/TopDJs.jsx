@@ -83,42 +83,63 @@ function useSpotifyEnrichment(artistNames, onEnrich) {
 
 export default function TopDJs() {
   const navigate = useNavigate()
-  const { getArtistSeenCounts, artistMeta, artistRatings, getFestivalMeta, batchEnrichArtists } = useUserData()
+  const { getArtistSeenCounts, artistMeta, performanceRatings, getFestivalMeta, batchEnrichArtists } = useUserData()
+  const [selectedYear, setSelectedYear] = useState('all')
+  const [artistToManage, setArtistToManage] = useState(null)
 
-  // Build ranked list of artists by # of times seen
-  const ranking = useMemo(() => {
+  // Build ranked list of artists by # of times seen, filtered by year
+  const { ranking, availableYears } = useMemo(() => {
     const counts = getArtistSeenCounts()
-    return Object.entries(counts)
+    const years = new Set()
+
+    const list = Object.entries(counts)
       .map(([artistId, { count, events }]) => {
         const meta = artistMeta[artistId]
-        const rating = artistRatings[artistId] ?? 0
-        // Get festival names for each event
+        // Get festival info for each event
         const festivals = events.map(eid => {
           const fm = getFestivalMeta(eid)
-          return {
-            id: eid,
-            name: fm?.name ?? eid,
-            date: fm?.date ?? null,
-          }
+          return { id: eid, name: fm?.name ?? eid, date: fm?.date ?? null }
         })
+
+        // Track available years
+        festivals.forEach(f => { if (f.date) years.add(f.date.substring(0, 4)) })
+
+        // Filter by selected year
+        const filtered = selectedYear === 'all'
+          ? festivals
+          : festivals.filter(f => f.date?.startsWith(selectedYear))
+
+        if (filtered.length === 0) return null
+
+        // Average set rating across all seen festivals
+        const ratings = filtered.map(f => performanceRatings[`${f.id}::${artistId}`]).filter(r => r > 0)
+        const avgSetRating = ratings.length > 0
+          ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+          : 0
+
         return {
           id: artistId,
           name: meta?.name ?? artistId,
           image: meta?.image ?? null,
-          count,
-          rating,
-          festivals: festivals.sort((a,b) => (a.date || '').localeCompare(b.date || '')),
+          count: filtered.length,
+          avgSetRating,
+          festivals: filtered.sort((a, b) => (a.date || '').localeCompare(b.date || '')),
         }
       })
+      .filter(Boolean)
       .sort((a, b) => {
         if (b.count !== a.count) return b.count - a.count
-        if (b.rating !== a.rating) return b.rating - a.rating
+        if (b.avgSetRating !== a.avgSetRating) return b.avgSetRating - a.avgSetRating
         return a.name.localeCompare(b.name)
       })
-  }, [getArtistSeenCounts, artistMeta, artistRatings, getFestivalMeta])
 
-  // Fetch Spotify data for ranked artists (up to 15)
-  // Fetch Spotify data only for artists with missing data (up to 15)
+    return {
+      ranking: list,
+      availableYears: [...years].sort((a, b) => b.localeCompare(a)),
+    }
+  }, [getArtistSeenCounts, artistMeta, performanceRatings, getFestivalMeta, selectedYear])
+
+  // Fetch Spotify data for ranked artists (up to 15) — skip already enriched
   const artistNames = useMemo(() => {
     return ranking
       .slice(0, 15)
@@ -128,8 +149,6 @@ export default function TopDJs() {
       })
       .map(a => a.name)
   }, [ranking, artistMeta])
-  
-  const [artistToManage, setArtistToManage] = useState(null)
   
   const spotifyData = useSpotifyEnrichment(artistNames, (results) => {
     // Save enriched data back to global artistMeta
@@ -164,13 +183,36 @@ export default function TopDJs() {
   return (
     <div className="page">
       <div className="container">
-        <div style={{ paddingTop: 8, marginBottom: 32 }}>
+        <div style={{ paddingTop: 8, marginBottom: 24 }}>
           <h1 className="section-title" style={{ fontSize: '2rem', fontFamily: 'var(--font-display)', fontWeight: 800, marginBottom: 6 }}>
             Most Watched DJs
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Your all-time ranking of artists by number of live performances seen
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
+              Your ranking of artists by live performances seen
+            </p>
+            {/* Year filter */}
+            {availableYears.length > 0 && (
+              <select
+                value={selectedYear}
+                onChange={e => setSelectedYear(e.target.value)}
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: '7px 12px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.88rem',
+                  fontFamily: 'var(--font-sans)',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="all">All years</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            )}
+          </div>
         </div>
 
         {/* Quick stats bar */}
@@ -183,7 +225,7 @@ export default function TopDJs() {
             </div>
             <div className="stat-card">
               <div className="stat-label">Total Performances</div>
-              <div className="stat-value">{totalSeen}</div>
+              <div className="stat-value">{ranking.reduce((s,a)=>s+a.count,0)}</div>
               <div className="stat-sub">live shows watched</div>
             </div>
             <div className="stat-card">
@@ -263,38 +305,16 @@ export default function TopDJs() {
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: 4, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {artist.name}
                     </div>
-                    {/* Festivals list removed as per user request (moved to pop-up) */}
-                    {/* Full-width container that scrolls horizontal if genres overflow */}
-                    {((sp?.genres?.length > 0) || (artistMeta[artist.id]?.genres?.length > 0)) && (
-                      <div 
-                        className="hide-scrollbar"
-                        style={{ 
-                          display: 'flex', 
-                          gap: 6, 
-                          overflowX: 'auto', 
-                          whiteSpace: 'nowrap',
-                          marginTop: 6,
-                          paddingBottom: 2, // avoid clipping badges
-                        }}
-                      >
-                        {(sp?.genres || artistMeta[artist.id]?.genres || []).slice(0, 5).map(g => (
-                          <span 
-                            key={g} 
-                            style={{ 
-                              fontSize: '0.68rem', 
-                              padding: '2px 10px', 
-                              borderRadius: 999, 
-                              background: 'rgba(139, 92, 246, 0.1)', 
-                              color: 'var(--accent)', 
-                              border: '1px solid rgba(139, 92, 246, 0.2)', 
-                              textTransform: 'capitalize',
-                              flexShrink: 0
-                            }}
-                          >
-                            {g}
-                          </span>
+                    {/* Average set rating instead of genre tags */}
+                    {artist.avgSetRating > 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        {[1,2,3,4,5].map(s => (
+                          <span key={s} style={{ fontSize: '0.75rem', color: s <= Math.round(artist.avgSetRating) ? '#fbbf24' : 'rgba(255,255,255,0.15)' }}>★</span>
                         ))}
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 2 }}>{artist.avgSetRating.toFixed(1)}</span>
                       </div>
+                    ) : (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>No rating yet</div>
                     )}
                   </div>
 
@@ -329,7 +349,7 @@ export default function TopDJs() {
         <ArtistActionsModal 
           artist={artistToManage} 
           onClose={() => setArtistToManage(null)} 
-          artistMeta={artistMeta}
+          performanceRatings={performanceRatings}
         />
       </div>
     </div>
@@ -337,7 +357,7 @@ export default function TopDJs() {
 }
 
 /** Pop-up modal for DJ actions (See History / Go to Profile) */
-function ArtistActionsModal({ artist, onClose, artistMeta }) {
+function ArtistActionsModal({ artist, onClose, performanceRatings }) {
   const navigate = useNavigate()
   const [showHistory, setShowHistory] = useState(false)
 
@@ -383,12 +403,21 @@ function ArtistActionsModal({ artist, onClose, artistMeta }) {
           /* MAIN OPTIONS VIEW */
           <div style={{ padding: 24 }}>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: '1.2rem', fontFamily: 'var(--font-display)', fontWeight: 800, marginBottom: 8 }}>
+              <div style={{ fontSize: '1.2rem', fontFamily: 'var(--font-display)', fontWeight: 800, marginBottom: 6 }}>
                 {artist.name}
               </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                You have seen this DJ {artist.count} {artist.count === 1 ? 'time' : 'times'}
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: artist.avgSetRating > 0 ? 8 : 0 }}>
+                Seen {artist.count} {artist.count === 1 ? 'time' : 'times'}
               </div>
+              {/* Avg rating in main view */}
+              {artist.avgSetRating > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  {[1,2,3,4,5].map(s => (
+                    <span key={s} style={{ fontSize: '1rem', color: s <= Math.round(artist.avgSetRating) ? '#fbbf24' : 'rgba(255,255,255,0.15)' }}>★</span>
+                  ))}
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 4 }}>{artist.avgSetRating.toFixed(1)} avg</span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -442,22 +471,37 @@ function ArtistActionsModal({ artist, onClose, artistMeta }) {
             </div>
 
             <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-              {artist.festivals.map((fest, idx) => (
-                <div 
-                  key={fest.id + idx}
-                  style={{ 
-                    padding: '12px 0', 
-                    borderBottom: idx === artist.festivals.length - 1 ? 'none' : '1px solid var(--border)',
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 2 }}>{fest.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {fest.date ? new Date(fest.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date TBA'}
+              {artist.festivals.map((fest, idx) => {
+                const setRating = performanceRatings?.[`${fest.id}::${artist.id}`] ?? 0
+                return (
+                  <div 
+                    key={fest.id + idx}
+                    style={{ 
+                      padding: '12px 0', 
+                      borderBottom: idx === artist.festivals.length - 1 ? 'none' : '1px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fest.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {fest.date ? new Date(fest.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date TBA'}
+                      </div>
                     </div>
+                    {/* Per-set rating — only shown if rated */}
+                    {setRating > 0 && (
+                      <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                        {[1,2,3,4,5].map(s => (
+                          <span key={s} style={{ fontSize: '0.72rem', color: s <= setRating ? '#fbbf24' : 'rgba(255,255,255,0.15)' }}>★</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <button 

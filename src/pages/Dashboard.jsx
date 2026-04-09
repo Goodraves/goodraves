@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserData } from '../context/UserDataContext'
 import { getEventById } from '../api/ticketmaster'
@@ -15,43 +15,160 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const FestivalRow = React.memo(({ eventId, onRemove, isUpcomingTab }) => {
+/* ── Inline Edit Modal ──────────────────────────────────────────────── */
+function EditFestivalModal({ eventId, onClose }) {
+  const { getFestivalMeta, updateFestivalMeta } = useUserData()
+  const meta = getFestivalMeta(eventId)
+
+  const [name, setName] = useState(meta?.name ?? '')
+  const [date, setDate] = useState(meta?.date ?? '')
+  const [venue, setVenue] = useState(meta?.venue?.name ?? '')
+  const [city, setCity] = useState(meta?.venue?.city ?? '')
+  const [image, setImage] = useState(meta?.image ?? '')
+  const [lineup, setLineup] = useState((meta?.lineup ?? []).join(', '))
+  const [saved, setSaved] = useState(false)
+
+  if (!meta) return null
+
+  const handleSave = () => {
+    const updatedMeta = {
+      ...meta,
+      name: name.trim() || meta.name,
+      date: date.trim() || meta.date,
+      venue: { ...(meta.venue ?? {}), name: venue.trim() || null, city: city.trim() || null },
+      image: image.trim() || null,
+      lineup: lineup.split(/[,\n]/).map(s => s.trim()).filter(Boolean),
+    }
+    updateFestivalMeta(eventId, updatedMeta)
+    setSaved(true)
+    setTimeout(() => { setSaved(false); onClose() }, 800)
+  }
+
+  const inputStyle = {
+    width: '100%',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    padding: '10px 12px',
+    color: 'var(--text-primary)',
+    fontSize: '0.9rem',
+    fontFamily: 'var(--font-sans)',
+    outline: 'none',
+    boxSizing: 'border-box',
+  }
+  const labelStyle = { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 5, display: 'block', fontWeight: 600 }
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'flex-end',
+        justifyContent: 'center',
+        padding: '0 0 env(safe-area-inset-bottom, 0)',
+      }}
+    >
+      <div
+        className="fade-in"
+        style={{
+          background: 'var(--bg-card)',
+          width: '100%', maxWidth: 480,
+          borderRadius: '20px 20px 0 0',
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem' }}>✏️ Edit Festival</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.1rem', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
+        </div>
+
+        {/* Form — scrollable */}
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={labelStyle}>Event Name</label>
+            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <div>
+            <label style={labelStyle}>Date</label>
+            <input type="date" style={inputStyle} value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+          <div className="form-grid">
+            <div>
+              <label style={labelStyle}>Venue</label>
+              <input style={inputStyle} value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g. Gashouder" />
+            </div>
+            <div>
+              <label style={labelStyle}>City</label>
+              <input style={inputStyle} value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Amsterdam" />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Image URL</label>
+            <input style={inputStyle} value={image} onChange={e => setImage(e.target.value)} placeholder="https://…" />
+          </div>
+          <div>
+            <label style={labelStyle}>Lineup (comma-separated)</label>
+            <textarea
+              style={{ ...inputStyle, resize: 'vertical', minHeight: 72 }}
+              value={lineup}
+              onChange={e => setLineup(e.target.value)}
+              placeholder="Artist 1, Artist 2, …"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button onClick={onClose} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
+          <button onClick={handleSave} className="btn btn-primary" style={{ flex: 2 }}>
+            {saved ? '✓ Saved!' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Festival Row ───────────────────────────────────────────────────── */
+const FestivalRow = React.memo(({ eventId, onRemove, isUpcomingTab, onEdit }) => {
   const navigate = useNavigate()
-  const { getSeenCount, performanceRatings, seenArtists, getFestivalMeta } = useUserData()
+  const { getSeenCount, seenArtists, getFestivalMeta } = useUserData()
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const isLocal = eventId.startsWith('ra-') || eventId.startsWith('custom-')
+
   useEffect(() => {
-    if (eventId.startsWith('ra-') || eventId.startsWith('custom-')) {
-      setLoading(false)
-      return
-    }
+    if (isLocal) { setLoading(false); return }
     if (!HAS_KEY) { setLoading(false); return }
     getEventById(eventId)
       .then(setEvent)
       .catch(() => setEvent(null))
       .finally(() => setLoading(false))
-  }, [eventId])
+  }, [eventId, isLocal])
 
-  const localMeta = (eventId.startsWith('ra-') || eventId.startsWith('custom-')) ? getFestivalMeta(eventId) : null
+  const localMeta = isLocal ? getFestivalMeta(eventId) : null
   const displayEvent = localMeta || event
-
   const seenCount = getSeenCount(eventId)
-  const seenIds = seenArtists[eventId] ?? []
-  
-  // Calculate average performance rating for this specific festival
-  const ratings = seenIds.map(id => performanceRatings[`${eventId}::${id}`]).filter(Boolean)
-  const avgRating = ratings.length > 0
-    ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
-    : null
 
   const handleRemove = useCallback((e) => {
     e.stopPropagation()
     onRemove(eventId)
   }, [eventId, onRemove])
 
+  const handleEdit = useCallback((e) => {
+    e.stopPropagation()
+    onEdit(eventId)
+  }, [eventId, onEdit])
+
   if (loading) {
-    return <div className="skeleton" style={{ height: 80, borderRadius: 12 }} />
+    return <div className="skeleton" style={{ height: 76, borderRadius: 12 }} />
   }
 
   return (
@@ -60,7 +177,7 @@ const FestivalRow = React.memo(({ eventId, onRemove, isUpcomingTab }) => {
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         borderRadius: 12,
-        padding: '14px 16px',
+        padding: '12px 14px',
         display: 'flex',
         alignItems: 'center',
         gap: 12,
@@ -74,63 +191,48 @@ const FestivalRow = React.memo(({ eventId, onRemove, isUpcomingTab }) => {
     >
       {/* Thumbnail */}
       {displayEvent?.image ? (
-        <img
-          src={displayEvent.image}
-          alt=""
-          style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
-        />
+        <img src={displayEvent.image} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
       ) : (
-        <div style={{ width: 48, height: 48, borderRadius: 8, background: 'var(--gradient-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', flexShrink: 0 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 8, background: 'var(--gradient-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
           {eventId.startsWith('ra-') ? '🎧' : eventId.startsWith('custom-') ? '🎪' : '🎵'}
         </div>
       )}
 
-      {/* Text info — minWidth:0 is critical for truncation inside flex */}
+      {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 700,
-          fontSize: '0.95rem',
-          marginBottom: 3,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          color: 'var(--text-primary)',
-        }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.93rem', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
           {displayEvent?.name ?? eventId}
         </div>
-        <div style={{
-          fontSize: '0.78rem',
-          color: 'var(--text-secondary)',
-          display: 'flex',
-          gap: 10,
-          flexWrap: 'wrap',
-          lineHeight: 1.4,
-        }}>
-          {displayEvent?.date && (
-            <span style={{ whiteSpace: 'nowrap' }}>📅 {formatDate(displayEvent.date)}</span>
-          )}
-          {displayEvent?.venue?.city && (
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
-              📍 {displayEvent.venue.city}
-            </span>
-          )}
+        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', display: 'flex', gap: 8, flexWrap: 'wrap', lineHeight: 1.4 }}>
+          {displayEvent?.date && <span style={{ whiteSpace: 'nowrap' }}>📅 {formatDate(displayEvent.date)}</span>}
+          {displayEvent?.venue?.city && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>📍 {displayEvent.venue.city}</span>}
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
-        {!isUpcomingTab && seenCount > 0 && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, background: 'var(--gradient-hero)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{seenCount}</div>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Seen</div>
-          </div>
-        )}
-      </div>
+      {/* Seen badge */}
+      {!isUpcomingTab && seenCount > 0 && (
+        <div style={{ textAlign: 'center', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 800, background: 'var(--gradient-hero)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{seenCount}</div>
+          <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Seen</div>
+        </div>
+      )}
 
+      {/* Edit button — only for editable local events */}
+      {isLocal && (
+        <button
+          className="btn-ghost"
+          onClick={handleEdit}
+          title="Edit festival details"
+          style={{ fontSize: '0.9rem', color: 'var(--text-muted)', flexShrink: 0, padding: '4px 7px' }}
+        >
+          ✏️
+        </button>
+      )}
+
+      {/* Remove button */}
       <button
         className="btn-ghost"
-        style={{ fontSize: '0.85rem', color: 'var(--text-muted)', flexShrink: 0, padding: '4px 8px' }}
+        style={{ fontSize: '0.85rem', color: 'var(--text-muted)', flexShrink: 0, padding: '4px 7px' }}
         onClick={handleRemove}
         id={`remove-${eventId}`}
         title="Remove from list"
@@ -141,22 +243,25 @@ const FestivalRow = React.memo(({ eventId, onRemove, isUpcomingTab }) => {
   )
 })
 
+/* ── Dashboard page ─────────────────────────────────────────────────── */
 export default function Dashboard() {
   const {
     attendedFestivals,
     upcomingFestivals,
     seenArtists,
-    performanceRatings,
+    festivalRatings,
     artistNotes,
     toggleAttended,
     toggleUpcoming,
     importData,
     clearFestivals,
+    getFestivalMeta,
   } = useUserData()
   const navigate = useNavigate()
   const [showImport, setShowImport] = useState(false)
   const [activeTab, setActiveTab] = useState('attended')
   const [showAddCustom, setShowAddCustom] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const fileInputRef = useRef(null)
 
   const handleImportFile = (e) => {
@@ -173,19 +278,38 @@ export default function Dashboard() {
       } catch (err) {
         alert('Invalid backup file.')
       }
-      e.target.value = '' // Reset input
+      e.target.value = ''
     }
     reader.readAsText(file)
   }
 
   const totalSeen = Object.values(seenArtists).reduce((sum, arr) => sum + arr.length, 0)
-  const allRatings = Object.values(performanceRatings)
-  const avgRatingAll = allRatings.length > 0
-    ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(1)
+  const festivalRatingValues = attendedFestivals
+    .map(id => festivalRatings?.[id])
+    .filter(r => r && r > 0)
+  const avgRatingAll = festivalRatingValues.length > 0
+    ? (festivalRatingValues.reduce((a, b) => a + b, 0) / festivalRatingValues.length).toFixed(1)
     : null
   const totalNotes = Object.values(artistNotes).filter(n => n.trim()).length
-  
-  const displayList = activeTab === 'attended' ? attendedFestivals : upcomingFestivals
+
+  // Sort festivals by date — attending: newest first; upcoming: soonest first
+  const sortedAttended = useMemo(() => {
+    return [...attendedFestivals].sort((a, b) => {
+      const da = getFestivalMeta(a)?.date ?? ''
+      const db = getFestivalMeta(b)?.date ?? ''
+      return da.localeCompare(db) // oldest first
+    })
+  }, [attendedFestivals, getFestivalMeta])
+
+  const sortedUpcoming = useMemo(() => {
+    return [...upcomingFestivals].sort((a, b) => {
+      const da = getFestivalMeta(a)?.date ?? ''
+      const db = getFestivalMeta(b)?.date ?? ''
+      return da.localeCompare(db) // soonest first
+    })
+  }, [upcomingFestivals, getFestivalMeta])
+
+  const displayList = activeTab === 'attended' ? sortedAttended : sortedUpcoming
   const removeHandler = activeTab === 'attended' ? toggleAttended : toggleUpcoming
 
   return (
@@ -199,7 +323,6 @@ export default function Dashboard() {
             <div>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Your personal festival history & schedule</p>
             </div>
-            {/* RA Import removed as per user request */}
           </div>
         </div>
 
@@ -222,9 +345,9 @@ export default function Dashboard() {
             <div className="stat-sub">live performances tracked</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Avg. Rating</div>
+            <div className="stat-label">Avg. Vibe</div>
             <div className="stat-value">{avgRatingAll ?? '—'}</div>
-            <div className="stat-sub">{allRatings.length} sets rated</div>
+            <div className="stat-sub">{festivalRatingValues.length} festivals rated</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Upcoming</div>
@@ -282,10 +405,10 @@ export default function Dashboard() {
           <>
             <div className="section-header">
               <h2 className="section-title">{activeTab === 'attended' ? 'Attended Festivals' : 'Upcoming Festivals'}</h2>
-              <button 
-                className="btn btn-ghost btn-sm" 
+              <button
+                className="btn btn-ghost btn-sm"
                 onClick={() => {
-                  if (confirm(`Are you sure you want to clear your ${activeTab} list? This will also remove any artist ratings assocated with these festivals.`)) {
+                  if (confirm(`Are you sure you want to clear your ${activeTab} list? This will also remove any artist ratings associated with these festivals.`)) {
                     clearFestivals(activeTab)
                   }
                 }}
@@ -295,14 +418,25 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {displayList.map(id => (
-                <FestivalRow key={id} eventId={id} onRemove={removeHandler} isUpcomingTab={activeTab === 'upcoming'} />
+                <FestivalRow
+                  key={id}
+                  eventId={id}
+                  onRemove={removeHandler}
+                  isUpcomingTab={activeTab === 'upcoming'}
+                  onEdit={setEditingId}
+                />
               ))}
             </div>
           </>
         )}
       </div>
+
+      {/* Edit modal */}
+      {editingId && (
+        <EditFestivalModal eventId={editingId} onClose={() => setEditingId(null)} />
+      )}
     </div>
   )
 }
