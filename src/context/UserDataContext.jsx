@@ -60,10 +60,18 @@ function cleanOrphanData(state) {
   const seenArtists = {}
   const performanceRatings = {}
 
-  // Keep only meta for active festivals
+  // Keep meta for active festivals
   for (const id of activeIds) {
     if (state.festivalMeta[id]) festivalMeta[id] = state.festivalMeta[id]
     if (state.seenArtists[id]) seenArtists[id] = state.seenArtists[id]
+  }
+
+  // Also keep festivalMeta overrides for RA events — these are edits the user
+  // explicitly made and should not be wiped if the festival is temporarily removed
+  for (const [id, meta] of Object.entries(state.festivalMeta)) {
+    if (id.startsWith('ra-') && !festivalMeta[id]) {
+      festivalMeta[id] = meta
+    }
   }
 
   // Keep only relevant performance ratings
@@ -195,9 +203,11 @@ function reducer(state, action) {
     }
     case 'UPDATE_FESTIVAL_META': {
       const { id, meta } = action.payload
+      // Seed from raEvents if no prior festivalMeta entry exists (first edit of an RA event)
+      const base = state.festivalMeta[id] ?? state.raEvents[id] ?? {}
       return {
         ...state,
-        festivalMeta: { ...state.festivalMeta, [id]: { ...state.festivalMeta[id], ...meta } }
+        festivalMeta: { ...state.festivalMeta, [id]: { ...base, ...meta } }
       }
     }
     default:
@@ -229,9 +239,13 @@ export function UserDataProvider({ children }) {
     syncCodeRef.current = syncSettings.syncCode
   }, [syncSettings.syncCode])
 
-  // Save state to localStorage
+  // Save state to localStorage — debounced to 500ms to avoid
+  // serializing on every rapid-fire dispatch (e.g. bulk artist enrichment)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    const timer = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    }, 500)
+    return () => clearTimeout(timer)
   }, [state])
 
   // ── Auto-pull from cloud on app load ──────────────────────────────
@@ -394,36 +408,40 @@ export function UserDataProvider({ children }) {
   const updateFestivalMeta = (id, meta) =>
     dispatch({ type: 'UPDATE_FESTIVAL_META', payload: { id, meta } })
 
-  const isAttended = (eventId) => state.attendedFestivals.includes(eventId)
-  const isUpcoming = (eventId) => state.upcomingFestivals.includes(eventId)
-  const didSeeArtist = (eventId, artistId) =>
-    (state.seenArtists[eventId] ?? []).includes(artistId)
-  const getSeenCount = (eventId) => {
-    const isActive = state.attendedFestivals.includes(eventId) || state.upcomingFestivals.includes(eventId)
-    if (!isActive) return 0
+  // Pre-compute Sets for O(1) membership checks
+  const attendedSet = useMemo(() => new Set(state.attendedFestivals), [state.attendedFestivals])
+  const upcomingSet = useMemo(() => new Set(state.upcomingFestivals), [state.upcomingFestivals])
+
+  // Stable selector callbacks — these don't change unless the relevant slice of state changes
+  const isAttended = useCallback((eventId) => attendedSet.has(eventId), [attendedSet])
+  const isUpcoming = useCallback((eventId) => upcomingSet.has(eventId), [upcomingSet])
+  const didSeeArtist = useCallback((eventId, artistId) =>
+    (state.seenArtists[eventId] ?? []).includes(artistId),
+  [state.seenArtists])
+  const getSeenCount = useCallback((eventId) => {
+    if (!attendedSet.has(eventId) && !upcomingSet.has(eventId)) return 0
     return (state.seenArtists[eventId] ?? []).length
-  }
-  const getRating = (artistId) => state.artistRatings[artistId] ?? 0
-  const getPerformanceRating = (eventId, artistId) =>
-    state.performanceRatings[`${eventId}::${artistId}`] ?? 0
-  const getFestivalRating = (eventId) =>
-    state.festivalRatings?.[eventId] ?? 0
-  const getNotes = (artistId) => state.artistNotes[artistId] ?? ''
-  const getFestivalMeta = (eventId) => {
-    if (eventId.startsWith('ra-')) {
-      return state.raEvents[eventId] ?? null
-    }
-    return state.festivalMeta[eventId] ?? null
-  }
-  const getArtistMeta = (artistId) => state.artistMeta[artistId] ?? null
+  }, [attendedSet, upcomingSet, state.seenArtists])
+  const getRating = useCallback((artistId) => state.artistRatings[artistId] ?? 0, [state.artistRatings])
+  const getPerformanceRating = useCallback((eventId, artistId) =>
+    state.performanceRatings[`${eventId}::${artistId}`] ?? 0,
+  [state.performanceRatings])
+  const getFestivalRating = useCallback((eventId) =>
+    state.festivalRatings?.[eventId] ?? 0,
+  [state.festivalRatings])
+  const getNotes = useCallback((artistId) => state.artistNotes[artistId] ?? '', [state.artistNotes])
+  const getFestivalMeta = useCallback((eventId) => {
+    // festivalMeta acts as an override layer for all event types (including RA edits)
+    if (state.festivalMeta[eventId]) return state.festivalMeta[eventId]
+    if (eventId.startsWith('ra-')) return state.raEvents[eventId] ?? null
+    return null
+  }, [state.raEvents, state.festivalMeta])
+  const getArtistMeta = useCallback((artistId) => state.artistMeta[artistId] ?? null, [state.artistMeta])
 
   const getArtistSeenCounts = useCallback(() => {
     const counts = {}
     for (const [eventId, artistIds] of Object.entries(state.seenArtists)) {
-      // ONLY include artist data if the associated festival is still in the list
-      const isActive = state.attendedFestivals.includes(eventId) || state.upcomingFestivals.includes(eventId)
-      if (!isActive) continue
-
+      if (!attendedSet.has(eventId) && !upcomingSet.has(eventId)) continue
       for (const artistId of artistIds) {
         if (!counts[artistId]) {
           counts[artistId] = { count: 0, events: [] }
@@ -433,7 +451,7 @@ export function UserDataProvider({ children }) {
       }
     }
     return counts
-  }, [state.seenArtists, state.attendedFestivals, state.upcomingFestivals])
+  }, [state.seenArtists, attendedSet, upcomingSet])
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' })
@@ -480,7 +498,13 @@ export function UserDataProvider({ children }) {
     pullSync,
     pushSync,
     disconnectSync,
-  }), [state, syncSettings, syncStatus, getArtistSeenCounts]);
+  }), [
+    state,
+    syncSettings, syncStatus,
+    isAttended, isUpcoming, didSeeArtist, getSeenCount,
+    getRating, getPerformanceRating, getFestivalRating, getNotes,
+    getFestivalMeta, getArtistMeta, getArtistSeenCounts,
+  ])
 
   return (
     <UserDataContext.Provider value={contextValue}>

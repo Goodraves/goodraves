@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserData } from '../context/UserDataContext'
 import { searchArtist, HAS_SPOTIFY } from '../api/spotify'
 import StarRating from './StarRating'
 
-export default function ArtistCard({ artist, eventId }) {
+const ArtistCard = memo(function ArtistCard({ artist, eventId }) {
   const navigate = useNavigate()
   const { didSeeArtist, toggleSawArtist, getPerformanceRating } = useUserData()
   const saw = didSeeArtist(eventId, artist.id)
@@ -35,18 +35,18 @@ export default function ArtistCard({ artist, eventId }) {
   const displayImage = artist.image || spotifyImage
   const hasSpotifyEnhanced = !artist.image && spotifyImage
 
-  const handleToggle = (e) => {
+  const handleToggle = useCallback((e) => {
     e.stopPropagation()
     toggleSawArtist(eventId, artist.id, { 
       name: artist.name, 
       image: displayImage,
       genres: artist.genres || spotifyGenres 
     })
-  }
+  }, [eventId, artist.id, artist.name, displayImage, artist.genres, spotifyGenres, toggleSawArtist])
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     navigate(`/artist/${encodeURIComponent(artist.name)}?id=${artist.id}`)
-  }
+  }, [navigate, artist.name, artist.id])
 
   return (
     <div className="artist-card fade-in" id={`artist-${artist.id}`}>
@@ -75,4 +75,6 @@ export default function ArtistCard({ artist, eventId }) {
       </button>
     </div>
   )
-}
+})
+
+export default ArtistCard

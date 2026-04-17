@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import FestivalCard from '../components/FestivalCard'
 import { searchFestivals } from '../api/ticketmaster'
 import { searchEvents as searchEdmtrain, HAS_EDMTRAIN_KEY } from '../api/edmtrain'
@@ -6,6 +6,8 @@ import { useUserData } from '../context/UserDataContext'
 
 const HAS_TM_KEY = import.meta.env.VITE_TICKETMASTER_KEY &&
   import.meta.env.VITE_TICKETMASTER_KEY !== 'your_ticketmaster_api_key_here'
+
+const SESSION_KEY = 'goodraves_search_state'
 
 function SearchIcon() {
   return (
@@ -16,16 +18,34 @@ function SearchIcon() {
 }
 
 export default function Home() {
-  const [inputValue, setInputValue] = useState('')
-  const [query, setQuery] = useState('')
   const { raEvents, festivalMeta } = useUserData()
-  const [events, setEvents] = useState([])
+
+  // Restore search state from session (so Back from FestivalDetail works)
+  const restored = useRef(false)
+  const [inputValue, setInputValue] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.query ?? '' } catch { return '' }
+  })
+  const [query, setQuery] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.query ?? '' } catch { return '' }
+  })
+  const [events, setEvents] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.events ?? [] } catch { return [] }
+  })
+  const [searched, setSearched] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.searched ?? false } catch { return false }
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [pageInfo, setPageInfo] = useState(null)
-  const [searched, setSearched] = useState(false)
   const [tmPage, setTmPage] = useState(0)
   const [tmHasMore, setTmHasMore] = useState(false)
+
+  // Persist search state to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ query, events, searched }))
+    } catch { /* quota exceeded — ignore */ }
+  }, [query, events, searched])
 
   const doSearch = useCallback(async (q, p = 0) => {
     if (!q.trim()) return
@@ -111,13 +131,15 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
-  }, [raEvents])
+  }, [raEvents, festivalMeta])
 
   const handleSubmit = (e) => {
     e.preventDefault()
     setTmPage(0)
     setTmHasMore(false)
     setQuery(inputValue)
+    // Clear cached state before new search
+    try { sessionStorage.removeItem(SESSION_KEY) } catch {}
     doSearch(inputValue, 0)
   }
 

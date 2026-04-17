@@ -74,7 +74,21 @@ export default function Navbar() {
             ))}
           </div>
           {/* Cloud Sync button in the navbar */}
-          <SyncSettings />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* Reload button — only visible when launched as a PWA (no browser chrome) */}
+            <button
+              className="pwa-reload-btn"
+              onClick={() => window.location.reload()}
+              title="Reload app"
+              aria-label="Reload"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+            <SyncSettings />
+          </div>
         </div>
       </nav>
 
@@ -91,6 +105,11 @@ export default function Navbar() {
             <span className="bottom-nav-label">{item.label}</span>
           </NavLink>
         ))}
+        {/* Cloud Sync — always reachable in PWA standalone mode */}
+        <div className="bottom-nav-item bottom-nav-sync">
+          <SyncSettings />
+          <span className="bottom-nav-label">Sync</span>
+        </div>
       </nav>
     </>
   )

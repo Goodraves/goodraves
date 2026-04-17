@@ -34,40 +34,96 @@ export default function Insights() {
 
   // Data 2: Top Genres
   const topGenresData = useMemo(() => {
+    // Comprehensive map from Spotify's hyper-specific tags → clean parent genres
+    const GENRE_MAP = {
+      // Techno variants
+      'techno': 'techno', 'berlin techno': 'techno', 'amsterdam techno': 'techno',
+      'minimal techno': 'techno', 'acid techno': 'techno', 'industrial techno': 'techno',
+      'hard techno': 'techno', 'detroit techno': 'techno', 'dark techno': 'techno',
+      'uk techno': 'techno', 'dub techno': 'techno', 'raw techno': 'techno',
+      'schranz': 'techno', 'peak time techno': 'techno', 'melodic techno': 'melodic techno & house',
+      // House variants
+      'house': 'house', 'deep house': 'house', 'tech house': 'house',
+      'afro house': 'house', 'minimal house': 'house', 'chicago house': 'house',
+      'soulful house': 'house', 'vocal house': 'house', 'organic house': 'house',
+      'micro house': 'house', 'microhouse': 'house', 'nu house': 'house',
+      'french house': 'house', 'dutch house': 'house', 'funky house': 'house',
+      'minimal': 'house', 'minimal deep tech': 'house',
+      // Melodic/progressive
+      'melodic techno and house': 'melodic techno & house',
+      'melodic techno & house': 'melodic techno & house',
+      'progressive house': 'melodic techno & house', 'melodic house': 'melodic techno & house',
+      'afterhours': 'melodic techno & house',
+      // Trance
+      'trance': 'trance', 'progressive trance': 'trance', 'psytrance': 'trance',
+      'goa trance': 'trance', 'uplifting trance': 'trance', 'tech trance': 'trance',
+      // Electronic / ambient
+      'electronic': 'electronic', 'electronica': 'electronic', 'idm': 'electronic',
+      'ambient': 'electronic', 'experimental': 'electronic', 'modular synth': 'electronic',
+      'electro': 'electronic', 'electro music': 'electronic',
+      'braindance': 'electronic', 'glitch': 'electronic',
+      // Drum & bass / jungle
+      'drum and bass': 'drum & bass', 'drum & bass': 'drum & bass',
+      'jungle': 'drum & bass', 'neurofunk': 'drum & bass', 'liquid funk': 'drum & bass',
+      'd&b': 'drum & bass', 'dnb': 'drum & bass',
+      // Breaks / breakbeat
+      'breakbeat': 'breaks', 'breaks': 'breaks', 'break': 'breaks',
+      'nu-skool breaks': 'breaks',
+      // Disco / funk
+      'disco': 'disco', 'nu disco': 'disco', 'disco house': 'disco',
+      'funk': 'disco', 'funk carioca': 'disco',
+      // Hip-hop / r&b (sometimes enriched for DJs)
+      'hip hop': 'hip-hop', 'rap': 'hip-hop', 'trap': 'hip-hop',
+      // EBM / industrial
+      'ebm': 'industrial', 'industrial': 'industrial', 'dark electro': 'industrial',
+      'post-industrial': 'industrial',
+      //噪聲 / noise / experimental
+      'noise': 'experimental', 'power electronics': 'experimental',
+      // Garage / bass music
+      'uk garage': 'garage & bass', 'bassline': 'garage & bass', 'speed garage': 'garage & bass',
+      'grime': 'garage & bass', 'bass music': 'garage & bass', 'footwork': 'garage & bass',
+    }
+
+    // Tags that add no meaningful info — drop entirely
+    const BLACKLIST = new Set([
+      'dj', 'dj music', 'swedish', 'dancehall', 'rave', 'club', 'filter house',
+      'dutch', 'german', 'uk', 'belgian', 'french', 'belgian edm',
+    ])
+
     const counts = {}
     const artistSeenCounts = getArtistSeenCounts()
-    
+
     Object.entries(artistSeenCounts).forEach(([artistId, { count }]) => {
       const meta = artistMeta[artistId]
       const genres = meta?.genres ?? []
-      if (genres.length > 0) {
-        genres.slice(0, 3).forEach(g => {
-          counts[g] = (counts[g] || 0) + count
-        })
-      } else {
-        counts['Uncategorized'] = (counts['Uncategorized'] || 0) + count
-      }
-    })
-    
-    return Object.entries(counts)
-      .map(([name, count]) => {
-        // Apply immediate normalization for the chart
-        const BLACKLIST = new Set(['swedish', 'dancehall', 'rave'])
-        const MAPPINGS = { 'electronica': 'electronic', 'acid techno': 'acid', 'minimal techno': 'minimal' }
-        const lowerName = name.toLowerCase().trim()
-        if (BLACKLIST.has(lowerName)) return null
-        return { name: MAPPINGS[lowerName] || name, count }
+      if (genres.length === 0) return // skip un-enriched artists — no data to show
+
+      const mapped = new Set()
+      genres.slice(0, 4).forEach(raw => {
+        const lower = raw.toLowerCase().trim()
+        if (BLACKLIST.has(lower)) return
+        const canonical = GENRE_MAP[lower] || raw // fall back to raw if not in map
+        mapped.add(canonical)
       })
-      .filter(Boolean)
+
+      mapped.forEach(genre => {
+        counts[genre] = (counts[genre] || 0) + count
+      })
+    })
+
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      // Merge case-insensitive duplicates (e.g. "Techno" vs "techno")
       .reduce((acc, curr) => {
         const existing = acc.find(x => x.name.toLowerCase() === curr.name.toLowerCase())
         if (existing) existing.count += curr.count
-        else acc.push(curr)
+        else acc.push({ ...curr, name: curr.name.charAt(0).toUpperCase() + curr.name.slice(1) })
         return acc
       }, [])
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
   }, [getArtistSeenCounts, artistMeta])
+
   
   const cityData = useMemo(() => {
     const counts = {}

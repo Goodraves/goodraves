@@ -153,6 +153,8 @@ img {
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
   padding: 0 24px;
+  /* Clears the iPhone notch / status bar in PWA standalone mode */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .navbar-inner {
@@ -1822,6 +1824,44 @@ img {
 }
 
 /* =============================================
+   PWA STANDALONE MODE (Add to Home Screen)
+   ============================================= */
+@media (display-mode: standalone) {
+  /* Extra top padding so content clears the status bar on iOS */
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Prevent the navbar from being double-padded (it already has safe-area) */
+  .navbar {
+    position: sticky;
+    top: 0;
+  }
+
+  /* PWA reload button — shown in the top-right corner */
+  .pwa-reload-btn {
+    display: flex;
+  }
+}
+
+/* PWA reload button — hidden by default (only shown in standalone mode above) */
+.pwa-reload-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: color var(--transition-fast);
+}
+.pwa-reload-btn:hover {
+  color: var(--text-primary);
+}
+
+/* =============================================
    RESPONSIVE — MOBILE FIRST
    ============================================= */
 @media (max-width: 639px) {
@@ -1978,6 +2018,46 @@ img {
     padding: 6px 2px;
     min-width: 0;
     text-align: center;
+  }
+
+  /* Sync item in bottom nav — consistent sizing with nav items */
+  .bottom-nav-sync {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  /* The SyncSettings button inside bottom nav needs restyling */
+  .bottom-nav-sync > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+  }
+
+  /* Override SyncSettings trigger button width inside bottom nav */
+  .bottom-nav-sync #sync-toggle-btn {
+    padding: 4px;
+    border: none !important;
+    background: transparent !important;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+  }
+
+  /* Dropdown from bottom-nav opens upward */
+  .bottom-nav-sync [style*="position: absolute"] {
+    bottom: calc(100% + 8px) !important;
+    top: auto !important;
+    right: 0 !important;
+    left: auto !important;
   }
 
   .bottom-nav-item.active {
